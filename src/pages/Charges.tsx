@@ -1,5 +1,3 @@
-// src/pages/Charges.tsx
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -49,7 +47,7 @@ interface Charge {
   recurrence_interval: string | null;
   recurrence_day: number | null;
   next_charge_date: string | null;
-  is_canceled: boolean; // <-- ADICIONADO
+  is_canceled: boolean;
   clients: {
     name: string;
     phone: string;
@@ -90,6 +88,7 @@ export default function Charges() {
   };
 
   const loadData = async () => {
+    // ... (função loadData idêntica)
     try {
       const [chargesResult, clientsResult] = await Promise.all([
         supabase
@@ -131,7 +130,7 @@ export default function Charges() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // ... (Lógica de handleSubmit idêntica, não precisa mudar)
+    // ... (handleSubmit idêntica)
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
@@ -144,20 +143,23 @@ export default function Charges() {
         notes: formData.notes || null,
         payment_link: "https://exemplo.com/pagar", 
         is_recurrent: formData.is_recurrent,
-        is_canceled: false // Garante que novas cobranças não são canceladas
+        is_canceled: false
       };
 
       if (formData.is_recurrent) {
         chargeData.recurrence_interval = formData.recurrence_interval;
         chargeData.recurrence_day = parseInt(formData.recurrence_day);
         
-        const nextDate = new Date(formData.due_date);
+        // CORREÇÃO: Usar o fuso UTC para calcular a próxima data
+        const [year, month, day] = formData.due_date.split('-').map(Number);
+        const nextDate = new Date(Date.UTC(year, month - 1, day));
+        
         switch (formData.recurrence_interval) {
-          case "weekly": nextDate.setDate(nextDate.getDate() + 7); break;
-          case "biweekly": nextDate.setDate(nextDate.getDate() + 14); break;
-          case "monthly": nextDate.setMonth(nextDate.getMonth() + 1); break;
-          case "quarterly": nextDate.setMonth(nextDate.getMonth() + 3); break;
-          case "yearly": nextDate.setFullYear(nextDate.getFullYear() + 1); break;
+          case "weekly": nextDate.setUTCDate(nextDate.getUTCDate() + 7); break;
+          case "biweekly": nextDate.setUTCDate(nextDate.getUTCDate() + 14); break;
+          case "monthly": nextDate.setUTCMonth(nextDate.getUTCMonth() + 1); break;
+          case "quarterly": nextDate.setUTCMonth(nextDate.getUTCMonth() + 3); break;
+          case "yearly": nextDate.setUTCFullYear(nextDate.getUTCFullYear() + 1); break;
         }
         chargeData.next_charge_date = nextDate.toISOString().split('T')[0];
       } else {
@@ -190,12 +192,12 @@ export default function Charges() {
   };
 
   const exportToCSV = () => {
-    // ... (lógica de exportação permanece a mesma)
+    // ... (função exportToCSV idêntica)
     const headers = ["Cliente", "Valor", "Vencimento", "Status", "Recorrente", "Observações"];
     const rows = charges.map((charge) => [
       charge.clients.name,
       `R$ ${charge.amount.toFixed(2)}`,
-      new Date(charge.due_date).toLocaleDateString("pt-BR"),
+      new Date(charge.due_date).toLocaleDateString("pt-BR", { timeZone: "UTC" }), // CORREÇÃO AQUI
       charge.is_canceled ? "Cancelada" : (charge.status === "paid" ? "Pago" : charge.status === "pending" ? "Pendente" : "Atrasado"),
       charge.is_recurrent ? "Sim" : "Não",
       charge.notes || "",
@@ -212,49 +214,47 @@ export default function Charges() {
   };
 
   const sendReminder = async (chargeId: string, clientPhone: string) => {
-    // ... (lógica de envio permanece a mesma)
+    // ... (função sendReminder idêntica)
     toast.info("Lembrete enviado via WhatsApp!");
   };
 
-  // --- LÓGICA DE EXCLUSÃO AGORA É "CANCELAR" ---
   const handleDeleteConfirm = async () => {
+    // ... (função handleDeleteConfirm idêntica)
     if (!chargeToDelete) return;
     try {
-      // EM VEZ DE .delete(), USAMOS .update()
       const { error } = await supabase
         .from("charges")
-        .update({ is_canceled: true }) // AQUI ESTÁ A MUDANÇA
+        .update({ is_canceled: true }) 
         .eq("id", chargeToDelete);
       
       if (error) throw error;
       toast.success("Cobrança cancelada com sucesso!");
-      loadData(); // Recarrega os dados para mostrar o status "Cancelada"
+      loadData(); 
     } catch (error) {
       toast.error("Erro ao cancelar cobrança");
     } finally {
-      setChargeToDelete(null); // Fecha o AlertDialog
+      setChargeToDelete(null);
     }
   };
 
+  // --- MUDANÇA NA FUNÇÃO handleEdit ---
   const handleEdit = (charge: Charge) => {
-    // ... (lógica de edição permanece a mesma)
     setEditingCharge(charge);
     setFormData({
       client_id: charge.client_id,
       amount: charge.amount.toString(),
-      due_date: charge.due_date,
+      // CORREÇÃO: Pega apenas a parte "YYYY-MM-DD" da data
+      due_date: charge.due_date.split('T')[0], 
       notes: charge.notes || "",
       is_recurrent: charge.is_recurrent,
       recurrence_interval: charge.recurrence_interval || "monthly",
       recurrence_day: (charge.recurrence_day || 1).toString(),
     });
-    setOpen(true); 
+    setOpen(true);
   };
 
-  // --- getStatusBadge ATUALIZADO ---
-  const getStatusBadge = (charge: Charge) => { // Recebe a cobrança inteira
-    
-    // Se estiver cancelada, esse status tem prioridade
+  const getStatusBadge = (charge: Charge) => {
+    // ... (função getStatusBadge idêntica)
     if (charge.is_canceled) {
       return (
         <Badge variant="outline">
@@ -262,8 +262,6 @@ export default function Charges() {
         </Badge>
       );
     }
-
-    // Se não estiver cancelada, segue a lógica normal
     switch (charge.status) {
       case "paid":
         return (
@@ -293,7 +291,7 @@ export default function Charges() {
 
   return (
     <div className="space-y-6">
-      {/* ... (Header da página, botão Exportar, etc) ... */}
+      {/* ... (Header, Botão Exportar, Dialog) ... */}
        <div className="flex items-center justify-between">
          <div>
            <h1 className="text-3xl font-bold">Cobranças</h1>
@@ -323,7 +321,7 @@ export default function Charges() {
                </Button>
              </DialogTrigger>
              <DialogContent className="max-h-[90vh] overflow-y-auto">
-              {/* ... (Formulário do Dialog igual) ... */}
+              {/* ... (Formulário do Dialog idêntico) ... */}
                <DialogHeader>
                  <DialogTitle>{editingCharge ? "Editar Cobrança" : "Criar Cobrança"}</DialogTitle>
                  <DialogDescription>
@@ -401,7 +399,6 @@ export default function Charges() {
 
                  {formData.is_recurrent && (
                    <>
-                    {/* ... (Inputs de recorrência) ... */}
                      <div className="space-y-2">
                        <Label htmlFor="recurrence_interval">Intervalo de Recorrência</Label>
                        <Select
@@ -422,7 +419,6 @@ export default function Charges() {
                          </SelectContent>
                        </Select>
                      </div>
-
                      <div className="space-y-2">
                        <Label htmlFor="recurrence_day">Dia da Recorrência (1-31)</Label>
                        <Input
@@ -438,7 +434,6 @@ export default function Charges() {
                      </div>
                    </>
                  )}
-
                  <Button type="submit" className="w-full">
                    {editingCharge ? "Salvar Alterações" : "Criar e Enviar"}
                  </Button>
@@ -451,7 +446,6 @@ export default function Charges() {
       {loading ? (
         <p>Carregando...</p>
       ) : charges.length === 0 ? (
-        // ... (Card "Nenhuma cobrança") ...
         <Card>
           <CardHeader>
             <CardTitle>Nenhuma cobrança cadastrada</CardTitle>
@@ -465,8 +459,8 @@ export default function Charges() {
           {charges.map((charge) => (
             <Card key={charge.id}>
               <CardHeader>
+                {/* ... (Header do Card idêntico) ... */}
                 <div className="flex items-start justify-between">
-                  {/* ... (Nome do cliente, badge recorrente) ... */}
                   <div className="space-y-1">
                      <div className="flex items-center gap-2">
                        <CardTitle>{charge.clients.name}</CardTitle>
@@ -480,9 +474,7 @@ export default function Charges() {
                      <CardDescription>{charge.clients.phone}</CardDescription>
                    </div>
                   <div className="flex items-center gap-2">
-                    {getStatusBadge(charge)} {/* <-- PASSANDO A COBRANÇA INTEIRA */}
-                    
-                    {/* Não enviar lembrete se estiver paga OU cancelada */}
+                    {getStatusBadge(charge)}
                     {charge.status !== "paid" && !charge.is_canceled && ( 
                       <Button
                         variant="ghost"
@@ -492,8 +484,6 @@ export default function Charges() {
                         <Send className="h-4 w-4" />
                       </Button>
                     )}
-                    
-                    {/* Não editar se estiver cancelada */}
                     {!charge.is_canceled && (
                       <Button
                         variant="ghost"
@@ -503,9 +493,7 @@ export default function Charges() {
                         <Edit className="h-4 w-4" />
                       </Button>
                     )}
-
-                    {/* Botão de Excluir (Cancelar) */}
-                    {!charge.is_canceled && ( // Esconde o botão se já estiver cancelada
+                    {!charge.is_canceled && ( 
                       <Button
                         variant="ghost"
                         size="sm"
@@ -518,38 +506,40 @@ export default function Charges() {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* ... (Conteúdo do Card, valor, vencimento, etc) ... */}
                 <div className="grid gap-2 text-sm">
-                   <div className="flex justify-between">
-                     <span className="text-muted-foreground">Valor:</span>
-                     <span className="font-semibold">
-                       R$ {charge.amount.toFixed(2).replace(".", ",")}
-                     </span>
-                   </div>
-                   <div className="flex justify-between">
-                     <span className="text-muted-foreground">Vencimento:</span>
-                     <span>{new Date(charge.due_date).toLocaleDateString("pt-BR")}</span>
-                   </div>
-                   {charge.is_recurrent && charge.next_charge_date && (
-                     <div className="flex justify-between">
-                       <span className="text-muted-foreground">Próxima Cobrança:</span>
-                       <span>{new Date(charge.next_charge_date).toLocaleDateString("pt-BR")}</span>
-                     </div>
-                   )}
-                   {charge.notes && (
-                     <div className="flex justify-between">
-                       <span className="text-muted-foreground">Obs:</span>
-                       <span>{charge.notes}</span>
-                     </div>
-                   )}
-                 </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Valor:</span>
+                    <span className="font-semibold">
+                      R$ {charge.amount.toFixed(2).replace(".", ",")}
+                    </span>
+                  </div>
+                  {/* --- MUDANÇA NA EXIBIÇÃO DA DATA --- */}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Vencimento:</span>
+                    {/* CORREÇÃO: Adicionado timeZone: "UTC" */}
+                    <span>{new Date(charge.due_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span>
+                  </div>
+                  {charge.is_recurrent && charge.next_charge_date && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Próxima Cobrança:</span>
+                      {/* CORREÇÃO: Adicionado timeZone: "UTC" */}
+                      <span>{new Date(charge.next_charge_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span>
+                    </div>
+                  )}
+                  {charge.notes && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Obs:</span>
+                      <span>{charge.notes}</span>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {/* --- ALERTDIALOG ATUALIZADO --- */}
+      {/* ... (AlertDialog idêntico) ... */}
       <AlertDialog
         open={!!chargeToDelete}
         onOpenChange={(isOpen) => !isOpen && setChargeToDelete(null)}
@@ -558,7 +548,7 @@ export default function Charges() {
           <AlertDialogHeader>
             <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Essa ação não pode ser desfeita. Isso irá **Cancelar** a
+              Essa ação não pode ser desfeita. Isso irá **cancelar** a
               cobrança. Ela permanecerá no histórico como "Cancelada".
             </AlertDialogDescription>
           </AlertDialogHeader>

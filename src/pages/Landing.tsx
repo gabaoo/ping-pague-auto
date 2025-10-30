@@ -1,5 +1,9 @@
 import { Button } from "@/components/ui/button";
 import conversaWhatsAppImg from "../images/Conversa-de-pagamento-via-WhatsApp.webp";
+import imageEsteticista from "../images/Esteticista-em-ambiente-de-cuidados-_1_.webp";
+import imageProfessor from "../images/Professor-em-sala-de-aula-_1_.webp";
+import imagePersonal from "../images/Treinador-Pessoal-no-Ambiente-Moderno-_1_.webp";
+
 import {
   Accordion,
   AccordionContent,
@@ -102,22 +106,22 @@ export default function Landing() {
 
   const depoimentos = [
     {
-      img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80",
-      name: "João Silva",
+      img: imagePersonal,
+      name: "Paulo Silva",
       role: "Personal Trainer",
       text: "Recuperei 80% dos pagamentos atrasados em 2 semanas usando o PingPague.",
     },
     {
-      img: "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=100",
+      img: imageEsteticista,
       name: "Camila Andrade",
-      role: "Consultora Financeira",
+      role: "Esteticista",
       text: "Antes eu perdia horas cobrando. Agora, o sistema faz tudo sozinho.",
     },
     {
-      img: "https://images.pixabay.com/photo/2016/11/21/12/42/beard-1845166_960_720.jpg",
-      name: "Bruno G.",
-      role: "Fisioterapeuta",
-      text: "Facilita minha rotina e mantém meus clientes em dia. Recomendo demais!",
+      img: imageProfessor,
+      name: "Roberto M.",
+      role: "Professor Particular",
+      text: "Facilita minha rotina e mantém meus alunos em dia. Recomendo demais!",
     },
   ];
 
@@ -152,24 +156,29 @@ export default function Landing() {
 
   const faqItems = [
     {
-      question: "Preciso saber programar?",
+      question: "O dinheiro cai direto na minha conta?",
       answer:
-        "Não! O PingPague é 100% plug & play. Você não precisa de nenhum conhecimento técnico. Nós cuidamos de toda a automação e banco de dados.",
+        "Sim. Os pagamentos são feitos via link ou integração com o gateway de sua escolha (como PagSeguro ou Gerencianet), e o valor vai direto para sua conta bancária.",
     },
     {
-      question: "Como o pagamento é processado?",
+      question: "As mensagens são enviadas pelo meu WhatsApp?",
       answer:
-        "Usamos integração direta com PIX (ou seu gateway de pagamento preferido). O dinheiro vai direto para sua conta, sem intermediários.",
+        "Não! Por motivo de segurança e organização, realizamos cobranças pelo nosso WhatsApp. Todos os pagamentos são feitos pelos canais oficiais informados previamente.",
     },
     {
-      question: "O envio é pelo meu número de WhatsApp?",
+      question: "Como o sistema sabe quando o cliente pagou?",
       answer:
-        "Sim! A automação é conectada à sua conta do WhatsApp Business (via API) para que a mensagem seja enviada de forma personalizada e profissional pelo seu número.",
+        "O PingPague atualiza o status automaticamente assim que o pagamento é confirmado pelo seu gateway. Você verá o status de 'Pago' no painel sem precisar verificar manualmente.",
     },
     {
-      question: "O que é 'Onboarding em 10 minutos'?",
+      question: "E se o cliente não pagar na data?",
       answer:
-        "Significa que desde o momento do cadastro até o envio da sua primeira cobrança real, você levará menos de 10 minutos. É só conectar seu WhatsApp, cadastrar o cliente e o valor.",
+        "Você pode configurar lembretes automáticos para antes e depois do vencimento. Assim, o sistema reenvia as mensagens de forma educada e automática.",
+    },
+    {
+      question: "O PingPague é seguro?",
+      answer:
+        "Sim. Usamos autenticação com Supabase Auth e integrações seguras com provedores de pagamento. Seus dados e os dos seus clientes ficam protegidos o tempo todo.",
     },
   ];
 
@@ -233,7 +242,7 @@ export default function Landing() {
                   onClick={() => navigate("/auth")}
                 >
                   <Zap className="w-5 h-5 mr-2" />
-                  Comece agora (Teste grátis)
+                  Comece agora
                 </Button>
                 <Button
                   size="lg"
@@ -451,7 +460,7 @@ export default function Landing() {
                   }`}
               >
                 {plano.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-green-800 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-600 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">
                     <Star className="w-4 h-4 inline -mt-1 mr-1" />
                     Mais Popular
                   </div>
@@ -535,7 +544,7 @@ export default function Landing() {
               className="text-lg px-8 py-6 font-bold text-primary shadow-2xl transform hover:scale-105"
               onClick={() => navigate("/auth")}
             >
-              Teste grátis — sem cartão de crédito
+              Comece agora
             </Button>
             <p className="text-sm opacity-75 mt-4">
               Comece a testar gratuitamente. Sem cartão de crédito. Sem
@@ -562,24 +571,24 @@ export default function Landing() {
             <div className="rounded-lg border bg-card p-6">
               <div className="space-y-4">
                 <div className="flex items-center">
-                  <Mail className="w-5 h-5 text-primary mr-3" />
+                  <Mail className="w-5 h-5 text-red-500 mr-3" />
                   <a
-                    href="mailto:contato@pingpague.com.br"
+                    href="mailto:contatopingpague@gmail.com"
                     className="text-sm font-medium hover:text-primary transition"
                   >
-                    contato@pingpague.com.br
+                    contatopingpague@gmail.com
                   </a>
                 </div>
                 <div className="flex items-center">
-                  <Phone className="w-5 h-5 text-green-500 mr-3" />
+                  <Phone className="w-5 h-5 text-blue-500 mr-3" />
                   <span className="text-sm font-medium">
-                    (31) 9XXXX-XXXX (WhatsApp)
+                    (31) 9 7321-2680 (WhatsApp)
                   </span>
                 </div>
                 <div className="flex items-center">
                   <Clock className="w-5 h-5 text-muted-foreground mr-3" />
                   <span className="text-sm font-medium text-muted-foreground">
-                    Seg-Sex: 9h às 18h
+                    Seg-Sex: 8h às 18h
                   </span>
                 </div>
               </div>
@@ -604,7 +613,7 @@ export default function Landing() {
       </section>
 
       {/* 11. Footer */}
-      <footer className="bg-foreground text-background pt-16 pb-8">
+      <footer className="text-background pt-2 pb-2">
         <div className="container mx-auto px-4">
           <div className="border-t border-muted-foreground/30 pt-8 mt-12 flex flex-col md:flex-row justify-between items-center">
             <p className="text-muted-foreground text-sm">
@@ -640,7 +649,7 @@ export default function Landing() {
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 md:hidden z-50">
         <Button className="w-full" onClick={() => navigate("/auth")}>
           <Zap className="w-5 h-5 mr-2" />
-          Comece a testar grátis
+          Comece agora
         </Button>
       </div>
     </div>

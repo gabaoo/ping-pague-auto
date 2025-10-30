@@ -1,5 +1,3 @@
-// src/pages/Clients.tsx
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -41,8 +39,8 @@ interface Client {
   phone: string;
   email: string | null;
   created_at: string;
-  total_charged: number; // Este valor pode estar desatualizado
-  total_paid: number;    // Este valor pode estar desatualizado
+  total_charged: number;
+  total_paid: number;
   last_payment_date: string | null;
   overdue_count: number;
 }
@@ -54,7 +52,7 @@ interface Charge {
   due_date: string;
   paid_at: string | null;
   created_at: string;
-  is_canceled: boolean; // <-- ADICIONADO
+  is_canceled: boolean;
 }
 
 const initialFormData = {
@@ -95,8 +93,7 @@ export default function Clients() {
   };
 
   const loadClients = async () => {
-    // Esta função ainda carrega os dados possivelmente desatualizados.
-    // A mágica acontece em loadClientCharges()
+    // ... (lógica idêntica)
     try {
       const { data, error } = await supabase
         .from("clients")
@@ -112,32 +109,26 @@ export default function Clients() {
     }
   };
 
-  // --- FUNÇÃO loadClientCharges ATUALIZADA ---
   const loadClientCharges = async (clientId: string) => {
+    // ... (lógica idêntica de recálculo)
     try {
       const { data, error } = await supabase
         .from("charges")
-        .select("*, is_canceled") // <-- Buscando a nova coluna
+        .select("*, is_canceled")
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       const allCharges = data || [];
-
-      // --- LÓGICA DE RECALCULAR TOTAIS ---
-      
-      // 1. Filtra apenas cobranças ativas (não canceladas)
       const activeCharges = allCharges.filter(c => !c.is_canceled);
-
-      // 2. Calcula os totais com base nas cobranças ativas
+      
       const totalAtivo = activeCharges.reduce((acc, c) => acc + c.amount, 0);
       const totalPago = activeCharges
         .filter(c => c.status === 'paid')
         .reduce((acc, c) => acc + c.amount, 0);
       const overdueCount = activeCharges.filter(c => c.status === 'overdue').length;
       
-      // 3. Atualiza o estado principal 'clients'
       setClients(currentClients => 
         currentClients.map(client => 
           client.id === clientId 
@@ -149,10 +140,7 @@ export default function Clients() {
           : client
         )
       );
-
-      // 4. Define o histórico (com todas as cobranças, incluindo canceladas)
       setClientCharges(allCharges);
-
     } catch (error) {
       toast.error("Erro ao carregar histórico");
     }
@@ -161,24 +149,17 @@ export default function Clients() {
   const handleSubmit = async (e: React.FormEvent) => {
     // ... (lógica idêntica)
     e.preventDefault();
-    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
-
       const clientData = {
         user_id: user.id,
         name: formData.name,
         phone: formData.phone,
         email: formData.email || null,
       };
-
       if (editingClient) {
-        const { error } = await supabase
-          .from("clients")
-          .update(clientData)
-          .eq("id", editingClient.id);
-        
+        const { error } = await supabase.from("clients").update(clientData).eq("id", editingClient.id);
         if (error) throw error;
         toast.success("Cliente atualizado com sucesso!");
       } else {
@@ -186,7 +167,6 @@ export default function Clients() {
         if (error) throw error;
         toast.success("Cliente cadastrado com sucesso!");
       }
-
       setFormData(initialFormData);
       setEditingClient(null);
       setOpen(false);
@@ -210,11 +190,9 @@ export default function Clients() {
   const handleDeleteConfirm = async () => {
     // ... (lógica idêntica)
     if (!clientToDelete) return;
-
     try {
       const { error } = await supabase.from("clients").delete().eq("id", clientToDelete);
       if (error) throw error;
-
       toast.success("Cliente removido");
       loadClients();
     } catch (error) {
@@ -224,13 +202,11 @@ export default function Clients() {
     }
   };
 
-  // --- getStatusBadge ATUALIZADO ---
   const getStatusBadge = (charge: Charge) => {
-    
+    // ... (lógica idêntica)
     if (charge.is_canceled) {
       return <Badge variant="outline">Cancelada</Badge>;
     }
-
     const badges = {
       paid: <Badge className="bg-success text-success-foreground">Pago</Badge>,
       pending: <Badge className="bg-warning text-warning-foreground">Pendente</Badge>,
@@ -247,7 +223,6 @@ export default function Clients() {
            <h1 className="text-3xl font-bold">Clientes</h1>
            <p className="text-muted-foreground">Gerencie seus clientes</p>
          </div>
-
          <Dialog 
            open={open} 
            onOpenChange={(isOpen) => {
@@ -272,40 +247,19 @@ export default function Clients() {
                </DialogDescription>
              </DialogHeader>
              <form onSubmit={handleSubmit} className="space-y-4">
-               {/* ... (Formulário do Dialog) ... */}
+              {/* ... (Formulário do Dialog) ... */}
                <div className="space-y-2">
                  <Label htmlFor="name">Nome *</Label>
-                 <Input
-                   id="name"
-                   placeholder="Nome do cliente"
-                   value={formData.name}
-                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                   required
-                 />
+                 <Input id="name" placeholder="Nome do cliente" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
                </div>
-
                <div className="space-y-2">
                  <Label htmlFor="phone">Telefone (WhatsApp) *</Label>
-                 <Input
-                   id="phone"
-                   placeholder="(00) 00000-0000"
-                   value={formData.phone}
-                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                   required
-                 />
+                 <Input id="phone" placeholder="(00) 00000-0000" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
                </div>
-
                <div className="space-y-2">
                  <Label htmlFor="email">Email (opcional)</Label>
-                 <Input
-                   id="email"
-                   type="email"
-                   placeholder="cliente@email.com"
-                   value={formData.email}
-                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                 />
+                 <Input id="email" type="email" placeholder="cliente@email.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                </div>
-
                <Button type="submit" className="w-full">
                  {editingClient ? "Salvar Alterações" : "Cadastrar"}
                </Button>
@@ -317,7 +271,6 @@ export default function Clients() {
       {loading ? (
         <p>Carregando...</p>
       ) : clients.length === 0 ? (
-        // ... (Card "Nenhum cliente") ...
         <Card>
            <CardHeader>
              <CardTitle>Nenhum cliente cadastrado</CardTitle>
@@ -332,14 +285,11 @@ export default function Clients() {
             <AccordionItem key={client.id} value={client.id} className="border rounded-lg">
               <Card>
                 <CardHeader>
-                  <AccordionTrigger
-                    onClick={() => setSelectedClient(client.id)}
-                    className="hover:no-underline"
-                  >
+                  <AccordionTrigger onClick={() => setSelectedClient(client.id)} className="hover:no-underline">
                     <div className="flex items-start justify-between w-full pr-4">
                       <div className="text-left">
                         {/* ... (Nome do cliente, badge de atraso) ... */}
-                        <CardTitle className="flex items-center gap-2">
+                         <CardTitle className="flex items-center gap-2">
                            {client.name}
                            {client.overdue_count > 0 && (
                              <Badge variant="destructive" className="text-xs">
@@ -353,8 +303,8 @@ export default function Clients() {
                            <CardDescription className="mt-1">{client.email}</CardDescription>
                          )}
                         
-                        {/* ESTES VALORES AGORA SÃO RECALCULADOS E CORRIGIDOS */}
                         <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                          {/* ... (Total cobrado/pago) ... */}
                           <div>
                             <p className="text-muted-foreground">Total Cobrado</p>
                             <p className="font-bold text-lg">R$ {Number(client.total_charged || 0).toFixed(2)}</p>
@@ -370,32 +320,18 @@ export default function Clients() {
                         {client.last_payment_date && (
                           <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                             <Calendar className="h-3 w-3" />
-                            Último pagamento: {new Date(client.last_payment_date).toLocaleDateString("pt-BR")}
+                            {/* CORREÇÃO AQUI */}
+                            Último pagamento: {new Date(client.last_payment_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                           </div>
                         )}
                       </div>
 
                       {/* ... (Botões de Editar e Excluir Cliente) ... */}
                        <div className="flex flex-col sm:flex-row">
-                         <Button
-                           variant="ghost"
-                           size="icon"
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             handleEdit(client);
-                           }}
-                         >
+                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(client); }}>
                            <Edit className="h-4 w-4" />
                          </Button>
-                         <Button
-                           variant="ghost"
-                           size="icon"
-                           className="text-destructive"
-                           onClick={(e) => {
-                             e.stopPropagation(); 
-                             setClientToDelete(client.id); 
-                           }}
-                         >
+                         <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); setClientToDelete(client.id); }}>
                            <Trash2 className="h-4 w-4" />
                          </Button>
                        </div>
@@ -417,14 +353,11 @@ export default function Clients() {
                         </p>
                       ) : (
                         <div className="space-y-2">
-                          {/* O HISTÓRICO AGORA MOSTRA AS CANCELADAS */}
                           {clientCharges.map((charge) => (
                             <div
                               key={charge.id}
                               className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
-                                charge.is_canceled 
-                                  ? 'bg-muted/50 text-muted-foreground' 
-                                  : 'hover:bg-accent/50'
+                                charge.is_canceled ? 'bg-muted/50 text-muted-foreground' : 'hover:bg-accent/50'
                               }`}
                             >
                               <div>
@@ -432,11 +365,13 @@ export default function Clients() {
                                   R$ {Number(charge.amount).toFixed(2)}
                                 </p>
                                 <p className="text-xs">
-                                  Vencimento: {new Date(charge.due_date).toLocaleDateString("pt-BR")}
+                                  {/* CORREÇÃO AQUI */}
+                                  Vencimento: {new Date(charge.due_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                                 </p>
                                 {charge.paid_at && !charge.is_canceled && (
                                   <p className="text-xs text-success">
-                                    Pago em: {new Date(charge.paid_at).toLocaleDateString("pt-BR")}
+                                    {/* CORREÇÃO AQUI */}
+                                    Pago em: {new Date(charge.paid_at).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                                   </p>
                                 )}
                               </div>

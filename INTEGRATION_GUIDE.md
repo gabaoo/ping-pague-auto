@@ -52,7 +52,7 @@ Criadas 2 edge functions prontas para integração:
 1. [Cron Trigger] - Executa diariamente às 9h
    ↓
 2. [HTTP Request] - Chama edge function check-overdue-charges
-   URL: https://txyrhzvzofrxwkxaehkn.supabase.co/functions/v1/check-overdue-charges
+   URL: https://dzqkcrxcivlnuoniyqab.supabase.co/functions/v1/check-overdue-charges
    Method: POST
    ↓
 3. [Supabase Node] - Busca notificações pendentes
@@ -155,7 +155,7 @@ mercadopago.payment.create(payment_data)
 ### Configurar Webhook de Pagamento
 1. **No Gateway de Pagamento**: Configure a URL do webhook
    ```
-   https://txyrhzvzofrxwkxaehkn.supabase.co/functions/v1/payment-webhook
+   https://dzqkcrxcivlnuoniyqab.supabase.co/functions/v1/payment-webhook
    ```
 
 2. **Adaptar Payload**: Cada gateway envia formato diferente, adapte a edge function
@@ -208,7 +208,7 @@ SELECT cron.schedule(
   '0 9 * * *',
   $$
   SELECT net.http_post(
-    url:='https://txyrhzvzofrxwkxaehkn.supabase.co/functions/v1/check-overdue-charges',
+    url:='https://dzqkcrxcivlnuoniyqab.supabase.co/functions/v1/check-overdue-charges',
     headers:='{"Content-Type": "application/json", "Authorization": "Bearer SEU_ANON_KEY"}'::jsonb,
     body:='{}'::jsonb
   ) as request_id;
