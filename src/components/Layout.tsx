@@ -1,15 +1,10 @@
-import { ReactNode } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Users, CreditCard, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, LogOut, History } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface LayoutProps {
-  children: ReactNode;
-}
-
-export default function Layout({ children }: LayoutProps) {
+export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -26,6 +21,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { path: "/clients", icon: Users, label: "Clientes" },
     { path: "/charges", icon: CreditCard, label: "Cobranças" },
+    { path: "/historic", icon: History, label: "Histórico" },
   ];
 
   return (
@@ -66,7 +62,9 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </aside>
 
-      <main className="ml-64 p-8">{children}</main>
+      <main className="ml-64 p-8">
+        <Outlet />
+      </main>
     </div>
   );
 }
