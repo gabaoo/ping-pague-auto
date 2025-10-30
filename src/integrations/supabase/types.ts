@@ -21,9 +21,15 @@ export type Database = {
           created_at: string | null
           due_date: string
           id: string
+          is_recurrent: boolean | null
+          last_notification_sent_at: string | null
+          next_charge_date: string | null
           notes: string | null
           paid_at: string | null
+          parent_charge_id: string | null
           payment_link: string | null
+          recurrence_day: number | null
+          recurrence_interval: string | null
           status: Database["public"]["Enums"]["payment_status"] | null
           updated_at: string | null
           user_id: string
@@ -34,9 +40,15 @@ export type Database = {
           created_at?: string | null
           due_date: string
           id?: string
+          is_recurrent?: boolean | null
+          last_notification_sent_at?: string | null
+          next_charge_date?: string | null
           notes?: string | null
           paid_at?: string | null
+          parent_charge_id?: string | null
           payment_link?: string | null
+          recurrence_day?: number | null
+          recurrence_interval?: string | null
           status?: Database["public"]["Enums"]["payment_status"] | null
           updated_at?: string | null
           user_id: string
@@ -47,9 +59,15 @@ export type Database = {
           created_at?: string | null
           due_date?: string
           id?: string
+          is_recurrent?: boolean | null
+          last_notification_sent_at?: string | null
+          next_charge_date?: string | null
           notes?: string | null
           paid_at?: string | null
+          parent_charge_id?: string | null
           payment_link?: string | null
+          recurrence_day?: number | null
+          recurrence_interval?: string | null
           status?: Database["public"]["Enums"]["payment_status"] | null
           updated_at?: string | null
           user_id?: string
@@ -62,6 +80,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "charges_parent_charge_id_fkey"
+            columns: ["parent_charge_id"]
+            isOneToOne: false
+            referencedRelation: "charges"
+            referencedColumns: ["id"]
+          },
         ]
       }
       clients: {
@@ -69,27 +94,90 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
+          last_payment_date: string | null
           name: string
+          overdue_count: number | null
           phone: string
+          total_charged: number | null
+          total_paid: number | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
           email?: string | null
           id?: string
+          last_payment_date?: string | null
           name: string
+          overdue_count?: number | null
           phone: string
+          total_charged?: number | null
+          total_paid?: number | null
           user_id: string
         }
         Update: {
           created_at?: string | null
           email?: string | null
           id?: string
+          last_payment_date?: string | null
           name?: string
+          overdue_count?: number | null
           phone?: string
+          total_charged?: number | null
+          total_paid?: number | null
           user_id?: string
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          channel: string
+          charge_id: string
+          client_id: string
+          id: string
+          message_content: string | null
+          notification_type: string
+          sent_at: string | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          channel: string
+          charge_id: string
+          client_id: string
+          id?: string
+          message_content?: string | null
+          notification_type: string
+          sent_at?: string | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          charge_id?: string
+          client_id?: string
+          id?: string
+          message_content?: string | null
+          notification_type?: string
+          sent_at?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_charge_id_fkey"
+            columns: ["charge_id"]
+            isOneToOne: false
+            referencedRelation: "charges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -117,7 +205,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_overdue_charges: { Args: never; Returns: undefined }
     }
     Enums: {
       payment_status: "pending" | "paid" | "overdue"

@@ -4,7 +4,8 @@ import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, CreditCard, CheckCircle, Clock } from "lucide-react";
+import { Users, CreditCard, CheckCircle, Clock, TrendingUp, AlertCircle } from "lucide-react";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -13,7 +14,14 @@ export default function Dashboard() {
     totalCharges: 0,
     paidCharges: 0,
     pendingCharges: 0,
+    overdueCharges: 0,
+    totalAmount: 0,
+    paidAmount: 0,
+    pendingAmount: 0,
+    overdueAmount: 0,
   });
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [recentCharges, setRecentCharges] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,21 +41,61 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Update overdue charges first
+      await supabase.rpc("update_overdue_charges");
+
       const [clientsResult, chargesResult] = await Promise.all([
         supabase.from("clients").select("id", { count: "exact" }),
-        supabase.from("charges").select("id, status", { count: "exact" }),
+        supabase.from("charges").select("*, clients(name)", { count: "exact" }),
       ]);
 
-      const paidCount = chargesResult.data?.filter((c) => c.status === "paid").length || 0;
-      const pendingCount = chargesResult.data?.filter((c) => c.status === "pending").length || 0;
+      const charges = chargesResult.data || [];
+      const paidCharges = charges.filter((c) => c.status === "paid");
+      const pendingCharges = charges.filter((c) => c.status === "pending");
+      const overdueCharges = charges.filter((c) => c.status === "overdue");
+
+      const totalAmount = charges.reduce((sum, c) => sum + Number(c.amount), 0);
+      const paidAmount = paidCharges.reduce((sum, c) => sum + Number(c.amount), 0);
+      const pendingAmount = pendingCharges.reduce((sum, c) => sum + Number(c.amount), 0);
+      const overdueAmount = overdueCharges.reduce((sum, c) => sum + Number(c.amount), 0);
 
       setStats({
         totalClients: clientsResult.count || 0,
-        totalCharges: chargesResult.count || 0,
-        paidCharges: paidCount,
-        pendingCharges: pendingCount,
+        totalCharges: charges.length,
+        paidCharges: paidCharges.length,
+        pendingCharges: pendingCharges.length,
+        overdueCharges: overdueCharges.length,
+        totalAmount,
+        paidAmount,
+        pendingAmount,
+        overdueAmount,
       });
+
+      // Prepare chart data (last 7 days)
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - i));
+        return date.toISOString().split("T")[0];
+      });
+
+      const chartData = last7Days.map((date) => {
+        const dayCharges = charges.filter((c) => c.created_at?.startsWith(date));
+        const paid = dayCharges.filter((c) => c.status === "paid").reduce((sum, c) => sum + Number(c.amount), 0);
+        return {
+          date: new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }),
+          valor: paid,
+        };
+      });
+
+      setChartData(chartData);
+
+      // Recent charges (last 5)
+      const recent = charges
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5);
+      setRecentCharges(recent);
     } catch (error) {
+      console.error("Error loading stats:", error);
       toast.error("Erro ao carregar estatísticas");
     } finally {
       setLoading(false);
@@ -56,34 +104,49 @@ export default function Dashboard() {
 
   const statCards = [
     {
+      title: "Total Recebido",
+      value: `R$ ${stats.paidAmount.toFixed(2)}`,
+      icon: CheckCircle,
+      description: `${stats.paidCharges} cobranças pagas`,
+      color: "text-success",
+    },
+    {
+      title: "Pendente",
+      value: `R$ ${stats.pendingAmount.toFixed(2)}`,
+      icon: Clock,
+      description: `${stats.pendingCharges} cobranças pendentes`,
+      color: "text-warning",
+    },
+    {
+      title: "Em Atraso",
+      value: `R$ ${stats.overdueAmount.toFixed(2)}`,
+      icon: AlertCircle,
+      description: `${stats.overdueCharges} cobranças atrasadas`,
+      color: "text-destructive",
+    },
+    {
       title: "Total de Clientes",
       value: stats.totalClients,
       icon: Users,
       description: "Clientes cadastrados",
       color: "text-primary",
     },
-    {
-      title: "Total de Cobranças",
-      value: stats.totalCharges,
-      icon: CreditCard,
-      description: "Cobranças criadas",
-      color: "text-accent",
-    },
-    {
-      title: "Cobranças Pagas",
-      value: stats.paidCharges,
-      icon: CheckCircle,
-      description: "Pagamentos confirmados",
-      color: "text-success",
-    },
-    {
-      title: "Cobranças Pendentes",
-      value: stats.pendingCharges,
-      icon: Clock,
-      description: "Aguardando pagamento",
-      color: "text-warning",
-    },
   ];
+
+  const pieData = [
+    { name: "Pago", value: stats.paidAmount, color: "hsl(var(--success))" },
+    { name: "Pendente", value: stats.pendingAmount, color: "hsl(var(--warning))" },
+    { name: "Atrasado", value: stats.overdueAmount, color: "hsl(var(--destructive))" },
+  ].filter((item) => item.value > 0);
+
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      paid: <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">Pago</span>,
+      pending: <span className="inline-flex items-center rounded-full bg-warning/10 px-2 py-1 text-xs font-medium text-warning">Pendente</span>,
+      overdue: <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">Atrasado</span>,
+    };
+    return badges[status as keyof typeof badges] || null;
+  };
 
   return (
     <Layout>
@@ -111,14 +174,111 @@ export default function Dashboard() {
           })}
         </div>
 
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Recebimentos (últimos 7 dias)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  Carregando...
+                </div>
+              ) : chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "hsl(var(--card))", 
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px"
+                      }}
+                      formatter={(value: number) => `R$ ${value.toFixed(2)}`}
+                    />
+                    <Line type="monotone" dataKey="valor" stroke="hsl(var(--success))" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  Nenhum dado disponível
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribuição de Valores</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  Carregando...
+                </div>
+              ) : pieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => `R$ ${value.toFixed(2)}`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  Nenhum dado disponível
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>Bem-vindo ao PingPague!</CardTitle>
-            <CardDescription>
-              Automatize suas cobranças e economize tempo. Comece cadastrando seus clientes e criando
-              suas primeiras cobranças.
-            </CardDescription>
+            <CardTitle>Cobranças Recentes</CardTitle>
+            <CardDescription>Últimas 5 cobranças criadas</CardDescription>
           </CardHeader>
+          <CardContent>
+            {loading ? (
+              <p className="text-muted-foreground">Carregando...</p>
+            ) : recentCharges.length === 0 ? (
+              <p className="text-muted-foreground">Nenhuma cobrança encontrada</p>
+            ) : (
+              <div className="space-y-3">
+                {recentCharges.map((charge) => (
+                  <div key={charge.id} className="flex items-center justify-between border-b pb-3 last:border-0">
+                    <div>
+                      <p className="font-medium">{charge.clients?.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Vencimento: {new Date(charge.due_date).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                    <div className="text-right flex items-center gap-3">
+                      <p className="font-bold">R$ {Number(charge.amount).toFixed(2)}</p>
+                      {getStatusBadge(charge.status)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
         </Card>
       </div>
     </Layout>

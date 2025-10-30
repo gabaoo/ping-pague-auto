@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, TrendingUp, AlertTriangle, Calendar } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface Client {
   id: string;
@@ -23,11 +30,26 @@ interface Client {
   phone: string;
   email: string | null;
   created_at: string;
+  total_charged: number;
+  total_paid: number;
+  last_payment_date: string | null;
+  overdue_count: number;
+}
+
+interface Charge {
+  id: string;
+  amount: number;
+  status: string;
+  due_date: string;
+  paid_at: string | null;
+  created_at: string;
 }
 
 export default function Clients() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const [clientCharges, setClientCharges] = useState<Charge[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -40,6 +62,12 @@ export default function Clients() {
     checkAuth();
     loadClients();
   }, []);
+
+  useEffect(() => {
+    if (selectedClient) {
+      loadClientCharges(selectedClient);
+    }
+  }, [selectedClient]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -61,6 +89,21 @@ export default function Clients() {
       toast.error("Erro ao carregar clientes");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadClientCharges = async (clientId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("charges")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setClientCharges(data || []);
+    } catch (error) {
+      toast.error("Erro ao carregar histórico");
     }
   };
 
@@ -90,6 +133,8 @@ export default function Clients() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja remover este cliente?")) return;
+
     try {
       const { error } = await supabase.from("clients").delete().eq("id", id);
       if (error) throw error;
@@ -99,6 +144,15 @@ export default function Clients() {
     } catch (error) {
       toast.error("Erro ao remover cliente");
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      paid: <Badge className="bg-success text-success-foreground">Pago</Badge>,
+      pending: <Badge className="bg-warning text-warning-foreground">Pendente</Badge>,
+      overdue: <Badge variant="destructive">Atrasado</Badge>,
+    };
+    return badges[status as keyof typeof badges] || null;
   };
 
   return (
@@ -176,31 +230,108 @@ export default function Clients() {
             </CardHeader>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Accordion type="single" collapsible className="space-y-4">
             {clients.map((client) => (
-              <Card key={client.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{client.name}</CardTitle>
-                      <CardDescription className="mt-1">{client.phone}</CardDescription>
-                      {client.email && (
-                        <CardDescription className="mt-1">{client.email}</CardDescription>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive"
-                      onClick={() => handleDelete(client.id)}
+              <AccordionItem key={client.id} value={client.id} className="border rounded-lg">
+                <Card>
+                  <CardHeader>
+                    <AccordionTrigger
+                      onClick={() => setSelectedClient(client.id)}
+                      className="hover:no-underline"
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-              </Card>
+                      <div className="flex items-start justify-between w-full pr-4">
+                        <div className="text-left">
+                          <CardTitle className="flex items-center gap-2">
+                            {client.name}
+                            {client.overdue_count > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                {client.overdue_count} atrasada{client.overdue_count > 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription className="mt-1">{client.phone}</CardDescription>
+                          {client.email && (
+                            <CardDescription className="mt-1">{client.email}</CardDescription>
+                          )}
+                          
+                          <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Total Cobrado</p>
+                              <p className="font-bold text-lg">R$ {Number(client.total_charged || 0).toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Total Pago</p>
+                              <p className="font-bold text-lg text-success">
+                                R$ {Number(client.total_paid || 0).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {client.last_payment_date && (
+                            <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              Último pagamento: {new Date(client.last_payment_date).toLocaleDateString("pt-BR")}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(client.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </AccordionTrigger>
+                  </CardHeader>
+                  
+                  <AccordionContent>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 border-t pt-4">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          <h3 className="font-semibold">Histórico de Cobranças</h3>
+                        </div>
+
+                        {clientCharges.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-4">
+                            Nenhuma cobrança registrada para este cliente
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {clientCharges.map((charge) => (
+                              <div
+                                key={charge.id}
+                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                              >
+                                <div>
+                                  <p className="font-medium">R$ {Number(charge.amount).toFixed(2)}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Vencimento: {new Date(charge.due_date).toLocaleDateString("pt-BR")}
+                                  </p>
+                                  {charge.paid_at && (
+                                    <p className="text-xs text-success">
+                                      Pago em: {new Date(charge.paid_at).toLocaleDateString("pt-BR")}
+                                    </p>
+                                  )}
+                                </div>
+                                {getStatusBadge(charge.status)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         )}
       </div>
     </Layout>
