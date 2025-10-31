@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, CreditCard, CheckCircle, Clock, TrendingUp, AlertCircle } from "lucide-react";
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { Users, CheckCircle, Clock, AlertCircle, TrendingUp } from "lucide-react";
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface Charge {
   id: string;
@@ -12,7 +15,6 @@ interface Charge {
   status: "pending" | "paid" | "overdue";
   created_at: string;
   due_date: string;
-  is_canceled: boolean;
   clients: {
     name: string;
   };
@@ -34,18 +36,43 @@ export default function Dashboard() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [recentCharges, setRecentCharges] = useState<Charge[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filter states
+  const [filterPeriod, setFilterPeriod] = useState<string>("all");
+  const [filterMonth, setFilterMonth] = useState<string>("");
+  const [filterYear, setFilterYear] = useState<string>("");
 
   useEffect(() => {
     checkAuth();
-    loadStats();
   }, []);
 
+  useEffect(() => {
+    loadStats();
+  }, [filterPeriod, filterMonth, filterYear]);
+
   const checkAuth = async () => {
-    // ... (lógica idêntica)
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       navigate("/auth");
     }
+  };
+
+  const getDateFilter = () => {
+    const now = new Date();
+    let startDate: Date | null = null;
+
+    if (filterPeriod === "month" && filterMonth) {
+      const [year, month] = filterMonth.split("-");
+      startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const endDate = new Date(parseInt(year), parseInt(month), 0);
+      return { startDate: startDate.toISOString(), endDate: endDate.toISOString() };
+    } else if (filterPeriod === "year" && filterYear) {
+      startDate = new Date(parseInt(filterYear), 0, 1);
+      const endDate = new Date(parseInt(filterYear), 11, 31);
+      return { startDate: startDate.toISOString(), endDate: endDate.toISOString() };
+    }
+
+    return null;
   };
 
   const loadStats = async () => {
@@ -55,25 +82,36 @@ export default function Dashboard() {
       
       await supabase.rpc("update_overdue_charges");
 
+      let chargesQuery = supabase
+        .from("charges")
+        .select("*, clients(name)", { count: "exact" })
+        .eq("user_id", user.id);
+
+      const dateFilter = getDateFilter();
+      if (dateFilter) {
+        chargesQuery = chargesQuery
+          .gte("created_at", dateFilter.startDate)
+          .lte("created_at", dateFilter.endDate);
+      }
+
       const [clientsResult, chargesResult] = await Promise.all([
-        supabase.from("clients").select("id", { count: "exact" }),
-        supabase.from("charges").select("*, clients(name), is_canceled", { count: "exact" }),
+        supabase.from("clients").select("id", { count: "exact" }).eq("user_id", user.id),
+        chargesQuery,
       ]);
 
       const allCharges: Charge[] = chargesResult.data || [];
-      const activeCharges = allCharges.filter(c => !c.is_canceled);
 
-      // ... (Cálculo de stats idêntico)
-      const paidCharges = activeCharges.filter((c) => c.status === "paid");
-      const pendingCharges = activeCharges.filter((c) => c.status === "pending");
-      const overdueCharges = activeCharges.filter((c) => c.status === "overdue");
-      const totalAmount = activeCharges.reduce((sum, c) => sum + Number(c.amount), 0);
+      const paidCharges = allCharges.filter((c) => c.status === "paid");
+      const pendingCharges = allCharges.filter((c) => c.status === "pending");
+      const overdueCharges = allCharges.filter((c) => c.status === "overdue");
+      const totalAmount = allCharges.reduce((sum, c) => sum + Number(c.amount), 0);
       const paidAmount = paidCharges.reduce((sum, c) => sum + Number(c.amount), 0);
       const pendingAmount = pendingCharges.reduce((sum, c) => sum + Number(c.amount), 0);
       const overdueAmount = overdueCharges.reduce((sum, c) => sum + Number(c.amount), 0);
+      
       setStats({
         totalClients: clientsResult.count || 0,
-        totalCharges: activeCharges.length,
+        totalCharges: allCharges.length,
         paidCharges: paidCharges.length,
         pendingCharges: pendingCharges.length,
         overdueCharges: overdueCharges.length,
@@ -86,16 +124,14 @@ export default function Dashboard() {
       // Prepare chart data (last 7 days)
       const last7Days = Array.from({ length: 7 }, (_, i) => {
         const date = new Date();
-        // CORREÇÃO: Usar setUTCDate para evitar problemas de fuso
-        date.setUTCDate(date.getUTCDate() - (6 - i)); 
+        date.setUTCDate(date.getUTCDate() - (6 - i));
         return date.toISOString().split("T")[0];
       });
 
       const chartData = last7Days.map((date) => {
-        const dayCharges = activeCharges.filter((c) => c.created_at?.startsWith(date));
+        const dayCharges = allCharges.filter((c) => c.created_at?.startsWith(date));
         const paid = dayCharges.filter((c) => c.status === "paid").reduce((sum, c) => sum + Number(c.amount), 0);
         return {
-          // CORREÇÃO: Adicionar timeZone: "UTC" para exibir a data correta no gráfico
           date: new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" }),
           valor: paid,
         };
@@ -117,7 +153,6 @@ export default function Dashboard() {
   };
 
   const statCards = [
-    // ... (array statCards idêntico)
     {
       title: "Total Recebido",
       value: `R$ ${stats.paidAmount.toFixed(2)}`,
@@ -149,17 +184,12 @@ export default function Dashboard() {
   ];
 
   const pieData = [
-    // ... (array pieData idêntico)
     { name: "Pago", value: stats.paidAmount, color: "hsl(var(--success))" },
     { name: "Pendente", value: stats.pendingAmount, color: "hsl(var(--warning))" },
     { name: "Atrasado", value: stats.overdueAmount, color: "hsl(var(--destructive))" },
   ].filter((item) => item.value > 0);
 
   const getStatusBadge = (charge: Charge) => {
-    // ... (função getStatusBadge idêntica)
-    if (charge.is_canceled) {
-      return <span className="inline-flex items-center rounded-full bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">Cancelada</span>;
-    }
     const badges = {
       paid: <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">Pago</span>,
       pending: <span className="inline-flex items-center rounded-full bg-warning/10 px-2 py-1 text-xs font-medium text-warning">Pendente</span>,
@@ -168,15 +198,80 @@ export default function Dashboard() {
     return badges[charge.status as keyof typeof badges] || null;
   };
 
+  // Generate year options (current year and 5 years back)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - i);
+
   return (
     <div className="space-y-8">
-      {/* ... (Header) ... */}
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Visão geral das suas cobranças</p>
       </div>
 
-      {/* ... (Stat Cards) ... */}
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="filter-period">Período</Label>
+              <Select 
+                value={filterPeriod} 
+                onValueChange={(value) => {
+                  setFilterPeriod(value);
+                  if (value === "all") {
+                    setFilterMonth("");
+                    setFilterYear("");
+                  }
+                }}
+              >
+                <SelectTrigger id="filter-period">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Geral (Todos)</SelectItem>
+                  <SelectItem value="month">Por Mês</SelectItem>
+                  <SelectItem value="year">Por Ano</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {filterPeriod === "month" && (
+              <div className="space-y-2">
+                <Label htmlFor="filter-month">Selecione o Mês</Label>
+                <Input
+                  id="filter-month"
+                  type="month"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                />
+              </div>
+            )}
+
+            {filterPeriod === "year" && (
+              <div className="space-y-2">
+                <Label htmlFor="filter-year">Selecione o Ano</Label>
+                <Select value={filterYear} onValueChange={setFilterYear}>
+                  <SelectTrigger id="filter-year">
+                    <SelectValue placeholder="Selecione o ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => {
           const Icon = stat.icon;
@@ -195,85 +290,81 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* ... (Gráficos) ... */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          {/* ... (Gráfico de Linha) ... */}
-           <CardHeader>
-             <CardTitle className="flex items-center gap-2">
-               <TrendingUp className="h-5 w-5 text-primary" />
-               Recebimentos (últimos 7 dias)
-             </CardTitle>
-           </CardHeader>
-           <CardContent>
-             {loading ? (
-               <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                 Carregando...
-               </div>
-             ) : chartData.length > 0 ? (
-               <ResponsiveContainer width="100%" height={200}>
-                 <LineChart data={chartData}>
-                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                   <YAxis stroke="hsl(var(--muted-foreground))" />
-                   <Tooltip 
-                     contentStyle={{ 
-                       backgroundColor: "hsl(var(--card))", 
-                       border: "1px solid hsl(var(--border))",
-                       borderRadius: "8px"
-                     }}
-                     formatter={(value: number) => `R$ ${value.toFixed(2)}`}
-                   />
-                   <Line type="monotone" dataKey="valor" stroke="hsl(var(--success))" strokeWidth={2} />
-                 </LineChart>
-               </ResponsiveContainer>
-             ) : (
-               <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                 Nenhum dado disponível
-               </div>
-             )}
-           </CardContent>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Recebimentos (últimos 7 dias)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Carregando...
+              </div>
+            ) : chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
+                  <YAxis stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }}
+                    formatter={(value: number) => `R$ ${value.toFixed(2)}`}
+                  />
+                  <Line type="monotone" dataKey="valor" stroke="hsl(var(--success))" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Nenhum dado disponível
+              </div>
+            )}
+          </CardContent>
         </Card>
         <Card>
-          {/* ... (Gráfico de Pizza) ... */}
-           <CardHeader>
-             <CardTitle>Distribuição de Valores</CardTitle>
-           </CardHeader>
-           <CardContent>
-             {loading ? (
-               <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                 Carregando...
-               </div>
-             ) : pieData.length > 0 ? (
-               <ResponsiveContainer width="100%" height={200}>
-                 <PieChart>
-                   <Pie
-                     data={pieData}
-                     cx="50%"
-                     cy="50%"
-                     labelLine={false}
-                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                     outerRadius={80}
-                     fill="#8884d8"
-                     dataKey="value"
-                   >
-                     {pieData.map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={entry.color} />
-                     ))}
-                   </Pie>
-                   <Tooltip formatter={(value: number) => `R$ ${value.toFixed(2)}`} />
-                 </PieChart>
-               </ResponsiveContainer>
-             ) : (
-               <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                 Nenhum dado disponível
-               </div>
-             )}
-           </CardContent>
+          <CardHeader>
+            <CardTitle>Distribuição de Valores</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Carregando...
+              </div>
+            ) : pieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => `R$ ${value.toFixed(2)}`} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Nenhum dado disponível
+              </div>
+            )}
+          </CardContent>
         </Card>
       </div>
 
-      {/* ... (Card Cobranças Recentes) ... */}
       <Card>
         <CardHeader>
           <CardTitle>Cobranças Recentes</CardTitle>
@@ -291,12 +382,11 @@ export default function Dashboard() {
                   <div>
                     <p className="font-medium">{charge.clients?.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {/* CORREÇÃO AQUI */}
                       Vencimento: {new Date(charge.due_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                     </p>
                   </div>
                   <div className="text-right flex items-center gap-3">
-                    <p className={`font-bold ${charge.is_canceled ? 'line-through text-muted-foreground' : ''}`}>
+                    <p className="font-bold">
                       R$ {Number(charge.amount).toFixed(2)}
                     </p>
                     {getStatusBadge(charge)}

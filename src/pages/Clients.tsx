@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, AlertTriangle, Calendar, Edit } from "lucide-react";
+import { Plus, Trash2, TrendingUp, AlertTriangle, Calendar, Edit, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -52,7 +52,6 @@ interface Charge {
   due_date: string;
   paid_at: string | null;
   created_at: string;
-  is_canceled: boolean;
 }
 
 const initialFormData = {
@@ -61,9 +60,12 @@ const initialFormData = {
   email: "",
 };
 
+const ITEMS_PER_PAGE = 20;
+
 export default function Clients() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
+  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [clientCharges, setClientCharges] = useState<Charge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +74,11 @@ export default function Clients() {
 
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+
+  // Pagination and Filter states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchName, setSearchName] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
 
   useEffect(() => {
     checkAuth();
@@ -84,16 +91,39 @@ export default function Clients() {
     }
   }, [selectedClient]);
 
+  useEffect(() => {
+    applyFilters();
+  }, [clients, searchName, searchPhone]);
+
   const checkAuth = async () => {
-    // ... (lógica idêntica)
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       navigate("/auth");
     }
   };
 
+  const applyFilters = () => {
+    let filtered = [...clients];
+
+    // Filter by name
+    if (searchName) {
+      filtered = filtered.filter(client =>
+        client.name.toLowerCase().includes(searchName.toLowerCase())
+      );
+    }
+
+    // Filter by phone
+    if (searchPhone) {
+      filtered = filtered.filter(client =>
+        client.phone.includes(searchPhone)
+      );
+    }
+
+    setFilteredClients(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
   const loadClients = async () => {
-    // ... (lógica idêntica)
     try {
       const { data, error } = await supabase
         .from("clients")
@@ -110,24 +140,22 @@ export default function Clients() {
   };
 
   const loadClientCharges = async (clientId: string) => {
-    // ... (lógica idêntica de recálculo)
     try {
       const { data, error } = await supabase
         .from("charges")
-        .select("*, is_canceled")
+        .select("*")
         .eq("client_id", clientId)
-        .order("created_at", { ascending: false });
+        .order("due_date", { ascending: false });
 
       if (error) throw error;
 
       const allCharges = data || [];
-      const activeCharges = allCharges.filter(c => !c.is_canceled);
       
-      const totalAtivo = activeCharges.reduce((acc, c) => acc + c.amount, 0);
-      const totalPago = activeCharges
+      const totalAtivo = allCharges.reduce((acc, c) => acc + c.amount, 0);
+      const totalPago = allCharges
         .filter(c => c.status === 'paid')
         .reduce((acc, c) => acc + c.amount, 0);
-      const overdueCount = activeCharges.filter(c => c.status === 'overdue').length;
+      const overdueCount = allCharges.filter(c => c.status === 'overdue').length;
       
       setClients(currentClients => 
         currentClients.map(client => 
@@ -147,7 +175,6 @@ export default function Clients() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    // ... (lógica idêntica)
     e.preventDefault();
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -177,7 +204,6 @@ export default function Clients() {
   };
 
   const handleEdit = (client: Client) => {
-    // ... (lógica idêntica)
     setEditingClient(client);
     setFormData({
       name: client.name,
@@ -188,7 +214,6 @@ export default function Clients() {
   };
 
   const handleDeleteConfirm = async () => {
-    // ... (lógica idêntica)
     if (!clientToDelete) return;
     try {
       const { error } = await supabase.from("clients").delete().eq("id", clientToDelete);
@@ -203,10 +228,6 @@ export default function Clients() {
   };
 
   const getStatusBadge = (charge: Charge) => {
-    // ... (lógica idêntica)
-    if (charge.is_canceled) {
-      return <Badge variant="outline">Cancelada</Badge>;
-    }
     const badges = {
       paid: <Badge className="bg-success text-success-foreground">Pago</Badge>,
       pending: <Badge className="bg-warning text-warning-foreground">Pendente</Badge>,
@@ -215,205 +236,269 @@ export default function Clients() {
     return badges[charge.status as keyof typeof badges] || null;
   };
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentClients = filteredClients.slice(startIndex, endIndex);
+
   return (
     <div className="space-y-6">
-      {/* ... (Header e Dialog de Clientes) ... */}
       <div className="flex items-center justify-between">
-         <div>
-           <h1 className="text-3xl font-bold">Clientes</h1>
-           <p className="text-muted-foreground">Gerencie seus clientes</p>
-         </div>
-         <Dialog 
-           open={open} 
-           onOpenChange={(isOpen) => {
-             setOpen(isOpen);
-             if (!isOpen) {
-               setEditingClient(null);
-               setFormData(initialFormData);
-             }
-           }}
-         >
-           <DialogTrigger asChild>
-             <Button>
-               <Plus className="mr-2 h-4 w-4" />
-               Novo Cliente
-             </Button>
-           </DialogTrigger>
-           <DialogContent>
-             <DialogHeader>
-               <DialogTitle>{editingClient ? "Editar Cliente" : "Cadastrar Cliente"}</DialogTitle>
-               <DialogDescription>
-                 {editingClient ? "Atualize os dados do cliente" : "Adicione um novo cliente à sua base"}
-               </DialogDescription>
-             </DialogHeader>
-             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* ... (Formulário do Dialog) ... */}
-               <div className="space-y-2">
-                 <Label htmlFor="name">Nome *</Label>
-                 <Input id="name" placeholder="Nome do cliente" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-               </div>
-               <div className="space-y-2">
-                 <Label htmlFor="phone">Telefone (WhatsApp) *</Label>
-                 <Input id="phone" placeholder="(00) 00000-0000" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
-               </div>
-               <div className="space-y-2">
-                 <Label htmlFor="email">Email (opcional)</Label>
-                 <Input id="email" type="email" placeholder="cliente@email.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-               </div>
-               <Button type="submit" className="w-full">
-                 {editingClient ? "Salvar Alterações" : "Cadastrar"}
-               </Button>
-             </form>
-           </DialogContent>
-         </Dialog>
-       </div>
+        <div>
+          <h1 className="text-3xl font-bold">Clientes</h1>
+          <p className="text-muted-foreground">Gerencie seus clientes</p>
+        </div>
+        <Dialog 
+          open={open} 
+          onOpenChange={(isOpen) => {
+            setOpen(isOpen);
+            if (!isOpen) {
+              setEditingClient(null);
+              setFormData(initialFormData);
+            }
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Cliente
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingClient ? "Editar Cliente" : "Cadastrar Cliente"}</DialogTitle>
+              <DialogDescription>
+                {editingClient ? "Atualize os dados do cliente" : "Adicione um novo cliente à sua base"}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome *</Label>
+                <Input id="name" placeholder="Nome do cliente" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone (WhatsApp) *</Label>
+                <Input id="phone" placeholder="(00) 00000-0000" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email (opcional)</Label>
+                <Input id="email" type="email" placeholder="cliente@email.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+              </div>
+              <Button type="submit" className="w-full">
+                {editingClient ? "Salvar Alterações" : "Cadastrar"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="search-name">Buscar por Nome</Label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="search-name"
+                  placeholder="Digite o nome..."
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="search-phone">Buscar por Telefone</Label>
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="search-phone"
+                  placeholder="Digite o telefone..."
+                  value={searchPhone}
+                  onChange={(e) => setSearchPhone(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <p>Carregando...</p>
-      ) : clients.length === 0 ? (
+      ) : filteredClients.length === 0 ? (
         <Card>
-           <CardHeader>
-             <CardTitle>Nenhum cliente cadastrado</CardTitle>
-             <CardDescription>
-               Comece adicionando seu primeiro cliente clicando no botão "Novo Cliente"
-             </CardDescription>
-           </CardHeader>
-         </Card>
+          <CardHeader>
+            <CardTitle>Nenhum cliente encontrado</CardTitle>
+            <CardDescription>
+              {clients.length === 0 
+                ? "Comece adicionando seu primeiro cliente clicando no botão \"Novo Cliente\""
+                : "Nenhum cliente corresponde aos filtros aplicados"}
+            </CardDescription>
+          </CardHeader>
+        </Card>
       ) : (
-        <Accordion type="single" collapsible className="space-y-4">
-          {clients.map((client) => (
-            <AccordionItem key={client.id} value={client.id} className="border rounded-lg">
-              <Card>
-                <CardHeader>
-                  <AccordionTrigger onClick={() => setSelectedClient(client.id)} className="hover:no-underline">
-                    <div className="flex items-start justify-between w-full pr-4">
-                      <div className="text-left">
-                        {/* ... (Nome do cliente, badge de atraso) ... */}
-                         <CardTitle className="flex items-center gap-2">
-                           {client.name}
-                           {client.overdue_count > 0 && (
-                             <Badge variant="destructive" className="text-xs">
-                               <AlertTriangle className="h-3 w-3 mr-1" />
-                               {client.overdue_count} atrasada{client.overdue_count > 1 ? 's' : ''}
-                             </Badge>
-                           )}
-                         </CardTitle>
-                         <CardDescription className="mt-1">{client.phone}</CardDescription>
-                         {client.email && (
-                           <CardDescription className="mt-1">{client.email}</CardDescription>
-                         )}
-                        
-                        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                          {/* ... (Total cobrado/pago) ... */}
-                          <div>
-                            <p className="text-muted-foreground">Total Cobrado</p>
-                            <p className="font-bold text-lg">R$ {Number(client.total_charged || 0).toFixed(2)}</p>
+        <>
+          <Accordion type="single" collapsible className="space-y-4">
+            {currentClients.map((client) => (
+              <AccordionItem key={client.id} value={client.id} className="border rounded-lg">
+                <Card>
+                  <CardHeader>
+                    <AccordionTrigger onClick={() => setSelectedClient(client.id)} className="hover:no-underline">
+                      <div className="flex items-start justify-between w-full pr-4">
+                        <div className="text-left">
+                          <CardTitle className="flex items-center gap-2">
+                            {client.name}
+                            {client.overdue_count > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                {client.overdue_count} atrasada{client.overdue_count > 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription className="mt-1">{client.phone}</CardDescription>
+                          {client.email && (
+                            <CardDescription className="mt-1">{client.email}</CardDescription>
+                          )}
+                          
+                          <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Total Cobrado</p>
+                              <p className="font-bold text-lg">R$ {Number(client.total_charged || 0).toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Total Pago</p>
+                              <p className="font-bold text-lg text-success">
+                                R$ {Number(client.total_paid || 0).toFixed(2)}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Total Pago</p>
-                            <p className="font-bold text-lg text-success">
-                              R$ {Number(client.total_paid || 0).toFixed(2)}
-                            </p>
-                          </div>
+
+                          {client.last_payment_date && (
+                            <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                              <Calendar className="h-3 w-3" />
+                              Último pagamento: {new Date(client.last_payment_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                            </div>
+                          )}
                         </div>
 
-                        {client.last_payment_date && (
-                          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            {/* CORREÇÃO AQUI */}
-                            Último pagamento: {new Date(client.last_payment_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                        <div className="flex flex-col sm:flex-row">
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(client); }}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); setClientToDelete(client.id); }}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                  </CardHeader>
+                  
+                  <AccordionContent>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 border-t pt-4">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          <h3 className="font-semibold">Histórico de Cobranças</h3>
+                        </div>
+
+                        {clientCharges.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-4">
+                            Nenhuma cobrança registrada para este cliente
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {clientCharges.map((charge) => (
+                              <div
+                                key={charge.id}
+                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                              >
+                                <div>
+                                  <p className="font-medium">
+                                    R$ {Number(charge.amount).toFixed(2)}
+                                  </p>
+                                  <p className="text-xs">
+                                    Vencimento: {new Date(charge.due_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                                  </p>
+                                  {charge.paid_at && (
+                                    <p className="text-xs text-success">
+                                      Pago em: {new Date(charge.paid_at).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                                    </p>
+                                  )}
+                                </div>
+                                {getStatusBadge(charge)}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+              </AccordionItem>
+            ))}
+          </Accordion>
 
-                      {/* ... (Botões de Editar e Excluir Cliente) ... */}
-                       <div className="flex flex-col sm:flex-row">
-                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(client); }}>
-                           <Edit className="h-4 w-4" />
-                         </Button>
-                         <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); setClientToDelete(client.id); }}>
-                           <Trash2 className="h-4 w-4" />
-                         </Button>
-                       </div>
-                    </div>
-                  </AccordionTrigger>
-                </CardHeader>
-                
-                <AccordionContent>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 border-t pt-4">
-                        <TrendingUp className="h-4 w-4 text-primary" />
-                        <h3 className="font-semibold">Histórico de Cobranças</h3>
-                      </div>
-
-                      {clientCharges.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4">
-                          Nenhuma cobrança registrada para este cliente
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {clientCharges.map((charge) => (
-                            <div
-                              key={charge.id}
-                              className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
-                                charge.is_canceled ? 'bg-muted/50 text-muted-foreground' : 'hover:bg-accent/50'
-                              }`}
-                            >
-                              <div>
-                                <p className={`font-medium ${charge.is_canceled ? 'line-through' : ''}`}>
-                                  R$ {Number(charge.amount).toFixed(2)}
-                                </p>
-                                <p className="text-xs">
-                                  {/* CORREÇÃO AQUI */}
-                                  Vencimento: {new Date(charge.due_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
-                                </p>
-                                {charge.paid_at && !charge.is_canceled && (
-                                  <p className="text-xs text-success">
-                                    {/* CORREÇÃO AQUI */}
-                                    Pago em: {new Date(charge.paid_at).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
-                                  </p>
-                                )}
-                              </div>
-                              {getStatusBadge(charge)}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </AccordionContent>
-              </Card>
-            </AccordionItem>
-          ))}
-        </Accordion>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages} ({filteredClients.length} clientes)
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* ... (AlertDialog de Excluir Cliente) ... */}
-       <AlertDialog
-         open={!!clientToDelete}
-         onOpenChange={(isOpen) => !isOpen && setClientToDelete(null)}
-       >
-         <AlertDialogContent>
-           <AlertDialogHeader>
-             <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
-             <AlertDialogDescription>
-               Essa ação não pode ser desfeita. Isso excluirá permanentemente o cliente.
-               (Se o cliente tiver cobranças, pode ocorrer um erro se a exclusão em cascata não estiver configurada no banco).
-             </AlertDialogDescription>
-           </AlertDialogHeader>
-           <AlertDialogFooter>
-             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-             <AlertDialogAction
-               onClick={handleDeleteConfirm}
-               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-             >
-               Excluir
-             </AlertDialogAction>
-           </AlertDialogFooter>
-         </AlertDialogContent>
-       </AlertDialog>
-
+      <AlertDialog
+        open={!!clientToDelete}
+        onOpenChange={(isOpen) => !isOpen && setClientToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação não pode ser desfeita. Isso excluirá permanentemente o cliente.
+              (Se o cliente tiver cobranças, pode ocorrer um erro se a exclusão em cascata não estiver configurada no banco).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import Clients from "./pages/Clients";
 import Charges from "./pages/Charges";
 import NotFound from "./pages/NotFound";
 import Historic from "./pages/Historic";
+import Profile from "./pages/Profile";
 import Layout from "./components/Layout";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/profile" element={<Profile />} />
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />

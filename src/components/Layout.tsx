@@ -1,8 +1,9 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Users, CreditCard, LogOut, History } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, LogOut, History, UserCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ProfileCompleteModal } from "@/components/ProfileCompleteModal";
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -22,10 +23,12 @@ export default function Layout() {
     { path: "/clients", icon: Users, label: "Clientes" },
     { path: "/charges", icon: CreditCard, label: "Cobranças" },
     { path: "/historic", icon: History, label: "Histórico" },
+    { path: "/profile", icon: UserCircle, label: "Meu Perfil" },
   ];
 
   return (
     <div className="min-h-screen bg-background">
+      <ProfileCompleteModal />
       <aside className="fixed left-0 top-0 h-full w-64 border-r border-border bg-card p-4">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-primary">PingPague</h1>
