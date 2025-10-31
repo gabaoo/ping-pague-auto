@@ -3,6 +3,7 @@ import conversaWhatsAppImg from "../images/Conversa-de-pagamento-via-WhatsApp.we
 import imageEsteticista from "../images/Esteticista-em-ambiente-de-cuidados-_1_.webp";
 import imageProfessor from "../images/Professor-em-sala-de-aula-_1_.webp";
 import imagePersonal from "../images/Treinador-Pessoal-no-Ambiente-Moderno-_1_.webp";
+import React from "react";
 
 import {
   Accordion,
@@ -14,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import {
   MessageSquarePlus,
   Zap,
+  ArrowRight,
   ArrowDown,
   Clock,
   TrendingDown,
@@ -339,26 +341,36 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {passos.map((passo) => (
-              <div key={passo.step} className="text-center">
-                <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="font-bold text-2xl text-primary-foreground">
-                    {passo.step}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-xl mb-4">{passo.title}</h3>
-                <p className="text-muted-foreground mb-6">
-                  {passo.description}
-                </p>
-                <div
-                  className={`rounded-lg p-4 ${passo.footerBg} bg-opacity-20`}
-                >
-                  <div className="text-sm text-primary font-semibold">
-                    {passo.footer}
+          <div className="flex flex-col md:flex-row items-start justify-center gap-8 md:gap-4">
+            {passos.map((passo, index) => (
+              // Usamos React.Fragment para agrupar o passo e a seta
+              <React.Fragment key={passo.step}>
+                {/* Este é o card do passo */}
+                <div className="flex-1 text-center flex flex-col md:max-w-sm">
+                  <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="font-bold text-2xl text-primary-foreground">
+                      {passo.step}
+                    </span>
+                  </div>
+                  <h3 className="font-semibold text-xl mb-4">{passo.title}</h3>
+                  <p className="text-muted-foreground mb-6 flex-grow">
+                    {passo.description}
+                  </p>
+                  <div
+                    className={`rounded-lg p-4 ${passo.footerBg} bg-opacity-20`}
+                  >
+                    <div className="text-sm text-primary font-semibold">
+                      {passo.footer}
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                {index < passos.length - 1 && (
+                  <div className="hidden md:flex items-center justify-center self-start px-4">
+                    <ArrowRight className="w-12 h-12 text-muted-foreground mt-4" />
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </div>
         </div>
@@ -649,10 +661,11 @@ export default function Landing() {
 
       {/* 12. Mobile CTA Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 md:hidden z-50">
-        <Button className="w-full" onClick={() => navigate("/auth")}>
+        <Button className="w-full" >
           <Zap className="w-5 h-5 mr-2" />
-          Comece agora
-        </Button>
+          <a href="#precos" >
+            Comece agora
+          </a>          </Button>
       </div>
     </div>
   );

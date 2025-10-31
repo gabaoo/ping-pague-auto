@@ -485,7 +485,6 @@ export default function Clients() {
             <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
             <AlertDialogDescription>
               Essa ação não pode ser desfeita. Isso excluirá permanentemente o cliente.
-              (Se o cliente tiver cobranças, pode ocorrer um erro se a exclusão em cascata não estiver configurada no banco).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
