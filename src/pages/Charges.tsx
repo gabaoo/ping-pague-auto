@@ -507,27 +507,27 @@ export default function Charges() {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-2 text-sm">
-                  <div className="flex justify-between">
+                  <div className="flex justify-start gap-2">
                     <span className="text-muted-foreground">Valor:</span>
                     <span className="font-semibold">
                       R$ {charge.amount.toFixed(2).replace(".", ",")}
                     </span>
                   </div>
                   {/* --- MUDANÇA NA EXIBIÇÃO DA DATA --- */}
-                  <div className="flex justify-between">
+                  <div className="flex justify-start gap-2">
                     <span className="text-muted-foreground">Vencimento:</span>
                     {/* CORREÇÃO: Adicionado timeZone: "UTC" */}
                     <span>{new Date(charge.due_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span>
                   </div>
                   {charge.is_recurrent && charge.next_charge_date && (
-                    <div className="flex justify-between">
+                    <div className="flex justify-start gap-2">
                       <span className="text-muted-foreground">Próxima Cobrança:</span>
                       {/* CORREÇÃO: Adicionado timeZone: "UTC" */}
                       <span>{new Date(charge.next_charge_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span>
                     </div>
                   )}
                   {charge.notes && (
-                    <div className="flex justify-between">
+                    <div className="flex justify-start gap-2">
                       <span className="text-muted-foreground">Obs:</span>
                       <span>{charge.notes}</span>
                     </div>

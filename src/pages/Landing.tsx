@@ -203,17 +203,18 @@ export default function Landing() {
                   Benefícios
                 </a>
               </Button>
-              <Button variant="link" asChild>
-                <a href="#precos" className="text-muted-foreground">
-                  Preços
-                </a>
-              </Button>
+
               <Button variant="link" asChild>
                 <a href="#faq" className="text-muted-foreground">
                   FAQ
                 </a>
               </Button>
-              <Button onClick={() => navigate("/auth")}>Comece agora</Button>
+              <Button variant="link" asChild>
+                <a href="#precos" className="text-muted-foreground">
+                  Comece agora
+                </a>
+              </Button>
+              <Button onClick={() => navigate("/auth")}>Entrar</Button>
             </div>
           </div>
         </div>
@@ -239,11 +240,11 @@ export default function Landing() {
                 <Button
                   size="lg"
                   className="text-lg px-8 py-6"
-                  onClick={() => navigate("/auth")}
                 >
                   <Zap className="w-5 h-5 mr-2" />
-                  Comece agora
-                </Button>
+                  <a href="#precos" >
+                    Comece agora
+                  </a>                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
@@ -538,14 +539,15 @@ export default function Landing() {
               Recupere seu tempo e profissionalize sua gestão financeira hoje
               mesmo.
             </p>
+
             <Button
               size="lg"
               variant="secondary" // 'secondary' no shadcn é o branco/claro
               className="text-lg px-8 py-6 font-bold text-primary shadow-2xl transform hover:scale-105"
-              onClick={() => navigate("/auth")}
             >
-              Comece agora
-            </Button>
+              <a href="#precos">
+                Comece agora
+              </a>            </Button>
             <p className="text-sm opacity-75 mt-4">
               Comece a testar gratuitamente. Sem cartão de crédito. Sem
               complicação.
