@@ -17,6 +17,7 @@ export type Database = {
       charges: {
         Row: {
           amount: number
+          canceled_at: string | null
           client_id: string
           created_at: string | null
           due_date: string
@@ -36,6 +37,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          canceled_at?: string | null
           client_id: string
           created_at?: string | null
           due_date: string
@@ -55,6 +57,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          canceled_at?: string | null
           client_id?: string
           created_at?: string | null
           due_date?: string
@@ -226,7 +229,7 @@ export type Database = {
       update_overdue_charges: { Args: never; Returns: undefined }
     }
     Enums: {
-      payment_status: "pending" | "paid" | "overdue"
+      payment_status: "pending" | "paid" | "overdue" | "canceled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -354,7 +357,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      payment_status: ["pending", "paid", "overdue"],
+      payment_status: ["pending", "paid", "overdue", "canceled"],
     },
   },
 } as const

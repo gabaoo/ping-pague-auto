@@ -12,9 +12,10 @@ import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tool
 interface Charge {
   id: string;
   amount: number;
-  status: "pending" | "paid" | "overdue";
+  status: "pending" | "paid" | "overdue" | "canceled";
   created_at: string;
   due_date: string;
+  canceled_at: string | null;
   clients: {
     name: string;
   };
@@ -101,10 +102,12 @@ export default function Dashboard() {
 
       const allCharges: Charge[] = chargesResult.data || [];
 
-      const paidCharges = allCharges.filter((c) => c.status === "paid");
-      const pendingCharges = allCharges.filter((c) => c.status === "pending");
-      const overdueCharges = allCharges.filter((c) => c.status === "overdue");
-      const totalAmount = allCharges.reduce((sum, c) => sum + Number(c.amount), 0);
+      // Exclude canceled charges from calculations
+      const activeCharges = allCharges.filter((c) => c.status !== "canceled");
+      const paidCharges = activeCharges.filter((c) => c.status === "paid");
+      const pendingCharges = activeCharges.filter((c) => c.status === "pending");
+      const overdueCharges = activeCharges.filter((c) => c.status === "overdue");
+      const totalAmount = activeCharges.reduce((sum, c) => sum + Number(c.amount), 0);
       const paidAmount = paidCharges.reduce((sum, c) => sum + Number(c.amount), 0);
       const pendingAmount = pendingCharges.reduce((sum, c) => sum + Number(c.amount), 0);
       const overdueAmount = overdueCharges.reduce((sum, c) => sum + Number(c.amount), 0);
@@ -129,7 +132,7 @@ export default function Dashboard() {
       });
 
       const chartData = last7Days.map((date) => {
-        const dayCharges = allCharges.filter((c) => c.created_at?.startsWith(date));
+        const dayCharges = activeCharges.filter((c) => c.created_at?.startsWith(date));
         const paid = dayCharges.filter((c) => c.status === "paid").reduce((sum, c) => sum + Number(c.amount), 0);
         return {
           date: new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" }),
@@ -194,6 +197,7 @@ export default function Dashboard() {
       paid: <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success">Pago</span>,
       pending: <span className="inline-flex items-center rounded-full bg-warning/10 px-2 py-1 text-xs font-medium text-warning">Pendente</span>,
       overdue: <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">Atrasado</span>,
+      canceled: <span className="inline-flex items-center rounded-full bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground">Cancelada</span>,
     };
     return badges[charge.status as keyof typeof badges] || null;
   };

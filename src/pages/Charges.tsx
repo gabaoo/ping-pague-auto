@@ -39,7 +39,7 @@ interface Charge {
   id: string;
   client_id: string;
   amount: number;
-  status: "pending" | "paid" | "overdue";
+  status: "pending" | "paid" | "overdue" | "canceled";
   due_date: string;
   payment_link: string | null;
   notes: string | null;
@@ -47,6 +47,7 @@ interface Charge {
   recurrence_interval: string | null;
   recurrence_day: number | null;
   next_charge_date: string | null;
+  canceled_at: string | null;
   clients: {
     name: string;
     phone: string;
@@ -76,6 +77,8 @@ export default function Charges() {
   
   const [editingCharge, setEditingCharge] = useState<Charge | null>(null);
   const [chargeToDelete, setChargeToDelete] = useState<string | null>(null);
+  const [editStatusDialogOpen, setEditStatusDialogOpen] = useState(false);
+  const [editingStatus, setEditingStatus] = useState<Charge | null>(null);
 
   // Pagination and Filter states
   const [currentPage, setCurrentPage] = useState(1);
@@ -216,7 +219,7 @@ export default function Charges() {
       charge.clients.name,
       `R$ ${charge.amount.toFixed(2)}`,
       new Date(charge.due_date).toLocaleDateString("pt-BR", { timeZone: "UTC" }),
-      charge.status === "paid" ? "Pago" : charge.status === "pending" ? "Pendente" : "Atrasado",
+      charge.status === "paid" ? "Pago" : charge.status === "pending" ? "Pendente" : charge.status === "overdue" ? "Atrasado" : "Cancelada",
       charge.is_recurrent ? "Sim" : "Não",
       charge.notes || "",
     ]);
@@ -238,18 +241,50 @@ export default function Charges() {
   const handleDeleteConfirm = async () => {
     if (!chargeToDelete) return;
     try {
+      // Soft delete: update status to canceled
       const { error } = await supabase
         .from("charges")
-        .delete()
+        .update({ 
+          status: "canceled",
+          canceled_at: new Date().toISOString()
+        })
         .eq("id", chargeToDelete);
       
       if (error) throw error;
-      toast.success("Cobrança excluída com sucesso!");
+      toast.success("Cobrança cancelada com sucesso!");
       loadData();
     } catch (error) {
-      toast.error("Erro ao excluir cobrança");
+      toast.error("Erro ao cancelar cobrança");
     } finally {
       setChargeToDelete(null);
+    }
+  };
+
+  const handleStatusChange = async () => {
+    if (!editingStatus) return;
+
+    try {
+      const updateData: any = { status: editingStatus.status };
+      
+      if (editingStatus.status === "canceled") {
+        updateData.canceled_at = new Date().toISOString();
+      } else if (editingStatus.status === "paid") {
+        updateData.paid_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from("charges")
+        .update(updateData)
+        .eq("id", editingStatus.id);
+
+      if (error) throw error;
+
+      toast.success("Status atualizado com sucesso!");
+      loadData();
+      setEditStatusDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("Erro ao atualizar status");
     }
   };
 
@@ -288,6 +323,12 @@ export default function Charges() {
           <Badge variant="destructive">
             <AlertCircle className="mr-1 h-3 w-3" />
             Vencido
+          </Badge>
+        );
+      case "canceled":
+        return (
+          <Badge variant="outline" className="bg-muted/50">
+            Cancelada
           </Badge>
         );
       default:
@@ -484,6 +525,7 @@ export default function Charges() {
                   <SelectItem value="paid">Pago</SelectItem>
                   <SelectItem value="pending">Pendente</SelectItem>
                   <SelectItem value="overdue">Vencido</SelectItem>
+                  <SelectItem value="canceled">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -525,7 +567,7 @@ export default function Charges() {
                     </div>
                     <div className="flex items-center gap-2">
                       {getStatusBadge(charge)}
-                      {charge.status !== "paid" && (
+                      {charge.status !== "paid" && charge.status !== "canceled" && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -544,11 +586,24 @@ export default function Charges() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setChargeToDelete(charge.id)}
-                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setEditingStatus(charge);
+                          setEditStatusDialogOpen(true);
+                        }}
+                        className="text-primary hover:text-primary"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        Status
                       </Button>
+                      {charge.status !== "canceled" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setChargeToDelete(charge.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -619,22 +674,67 @@ export default function Charges() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar cancelamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Essa ação não pode ser desfeita. Isso excluirá permanentemente a cobrança.
+              Tem certeza que deseja cancelar esta cobrança? A cobrança será marcada como cancelada e não será mais contabilizada nos totais.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              Cancelar Cobrança
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={editStatusDialogOpen} onOpenChange={setEditStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Status da Cobrança</DialogTitle>
+          </DialogHeader>
+          {editingStatus && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Cliente</Label>
+                <p className="text-sm text-muted-foreground">{editingStatus.clients.name}</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Valor</Label>
+                <p className="text-sm text-muted-foreground">R$ {Number(editingStatus.amount).toFixed(2)}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  value={editingStatus.status}
+                  onValueChange={(value) => setEditingStatus({ ...editingStatus, status: value as any })}
+                >
+                  <SelectTrigger id="edit-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="paid">Pago</SelectItem>
+                    <SelectItem value="overdue">Vencido</SelectItem>
+                    <SelectItem value="canceled">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditStatusDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleStatusChange}>
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

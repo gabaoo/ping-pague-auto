@@ -48,9 +48,10 @@ interface Client {
 interface Charge {
   id: string;
   amount: number;
-  status: string;
+  status: "pending" | "paid" | "overdue" | "canceled";
   due_date: string;
   paid_at: string | null;
+  canceled_at: string | null;
   created_at: string;
 }
 
@@ -232,6 +233,7 @@ export default function Clients() {
       paid: <Badge className="bg-success text-success-foreground">Pago</Badge>,
       pending: <Badge className="bg-warning text-warning-foreground">Pendente</Badge>,
       overdue: <Badge variant="destructive">Atrasado</Badge>,
+      canceled: <Badge variant="outline" className="bg-muted/50">Cancelada</Badge>,
     };
     return badges[charge.status as keyof typeof badges] || null;
   };
@@ -429,6 +431,11 @@ export default function Clients() {
                                   {charge.paid_at && (
                                     <p className="text-xs text-success">
                                       Pago em: {new Date(charge.paid_at).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                                    </p>
+                                  )}
+                                  {charge.canceled_at && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Cancelada em: {new Date(charge.canceled_at).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                                     </p>
                                   )}
                                 </div>
