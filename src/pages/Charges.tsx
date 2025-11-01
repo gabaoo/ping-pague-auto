@@ -289,6 +289,12 @@ export default function Charges() {
   };
 
   const handleEdit = (charge: Charge) => {
+    // Block editing for canceled charges
+    if (charge.status === "canceled") {
+      toast.error("Cobranças canceladas não podem ser editadas");
+      return;
+    }
+    
     setEditingCharge(charge);
     setFormData({
       client_id: charge.client_id,
@@ -576,33 +582,35 @@ export default function Charges() {
                           <Send className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(charge)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingStatus(charge);
-                          setEditStatusDialogOpen(true);
-                        }}
-                        className="text-primary hover:text-primary"
-                      >
-                        Status
-                      </Button>
                       {charge.status !== "canceled" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setChargeToDelete(charge.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(charge)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingStatus(charge);
+                              setEditStatusDialogOpen(true);
+                            }}
+                            className="text-primary hover:text-primary"
+                          >
+                            Status
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setChargeToDelete(charge.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -623,6 +631,12 @@ export default function Charges() {
                       <div className="flex justify-start gap-2">
                         <span className="text-muted-foreground">Próxima Cobrança:</span>
                         <span>{new Date(charge.next_charge_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span>
+                      </div>
+                    )}
+                    {charge.canceled_at && (
+                      <div className="flex justify-start gap-2">
+                        <span className="text-muted-foreground">Cancelada em:</span>
+                        <span>{new Date(charge.canceled_at).toLocaleDateString("pt-BR")}</span>
                       </div>
                     )}
                     {charge.notes && (
